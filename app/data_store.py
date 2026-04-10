@@ -1,4 +1,8 @@
 from .config import Config
+import json
+import os
+import glob
+from datetime import datetime
 
 # Simple in-memory cache for repositories (no background updates)
 registry_cache = {}
@@ -11,12 +15,11 @@ def get_registries():
 def get_registry_by_name(name):
     """Get registry config by name"""
     for reg in Config.REGISTRIES:
-        # Handle both string and dictionary formats
         if isinstance(reg, str):
             if reg == name:
                 return {
                     "name": reg,
-                    "api": "http://registry:5000",  # Default for development
+                    "api": "http://registry:5000",
                     "isAuthEnabled": False,
                     "default": True,
                     "bulkOperationsEnabled": False
@@ -61,10 +64,6 @@ def update_registry_config(registry_name, config):
 
 def store_scan_results(registry_name, repo, tag, result):
     """Store vulnerability scan results"""
-    from datetime import datetime
-    import json
-    import os
-    
     result["repo"] = repo
     result["tag"] = tag
     result["scannedAt"] = datetime.now().isoformat()
@@ -75,8 +74,8 @@ def store_scan_results(registry_name, repo, tag, result):
     key = f"{repo}:{tag}"
     scan_results[registry_name][key] = result
     
-    # Persist to per-image file only
-    data_dir = os.path.dirname(Config.CONFIG_FILE) if Config.CONFIG_FILE else '/app/data'
+    # FIX: Explicitly use /app/data to ensure persistence to the volume
+    data_dir = '/app/data'
     os.makedirs(data_dir, exist_ok=True)
     
     image_file = os.path.join(data_dir, f"{repo.replace('/', '_')}_{tag}.json")
@@ -89,20 +88,16 @@ def store_scan_results(registry_name, repo, tag, result):
 
 def get_scan_results(registry_name):
     """Get all scan results for a registry from individual image files"""
-    import json
-    import os
-    import glob
-    
     if registry_name not in scan_results:
         scan_results[registry_name] = {}
     
-    data_dir = os.path.dirname(Config.CONFIG_FILE) if Config.CONFIG_FILE else '/app/data'
+    # FIX: Explicitly use /app/data to look for files in the volume
+    data_dir = '/app/data'
     
     # Load all individual scan files
     scan_files = glob.glob(os.path.join(data_dir, "*_*.json"))
     for scan_file in scan_files:
         filename = os.path.basename(scan_file)
-        # Skip registry config files
         if filename.startswith('scan_results_') or filename == 'registries.config.json':
             continue
         
